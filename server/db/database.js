@@ -4,35 +4,32 @@ const { Pool } = require('pg');
 
 let db;
 
-// Check if running on Vercel or has DATABASE_URL (Railway)
+// Environment detection
 const isVercel = process.env.VERCEL === '1';
+const isProduction = process.env.NODE_ENV === 'production';
 const hasRailwayDb = !!process.env.DATABASE_URL;
 
-// Fallback SQLite for when PostgreSQL connection fails
-const setupSQLiteFallback = () => {
-  console.warn('Using SQLite fallback due to PostgreSQL connection issues');
-  const sqlite3 = require('sqlite3').verbose();
-  const sqliteDb = new sqlite3.Database(':memory:');
+// PostgreSQL connection setup
+const setupPostgresConnection = async () => {
+  console.log('Setting up PostgreSQL connection with Railway...');
   
-  sqliteDb.serialize(() => {
-    sqliteDb.run(`CREATE TABLE IF NOT EXISTS contacts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      email TEXT NOT NULL,
-      phone TEXT,
-      company TEXT NOT NULL,
-      message TEXT NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`);
-    console.log('SQLite fallback initialized with contacts table');
-  });
-  
-  return sqliteDb;
-};
-
-// Helper to initialize the contacts table in PostgreSQL
-const initPostgresTable = async (client) => {
   try {
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false // Required for Vercel to connect to Railway
+      },
+      // Connection pool settings
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000
+    });
+    
+    // Test the connection
+    const client = await pool.connect();
+    console.log('✅ Successfully connected to PostgreSQL database');
+    
+    // Create the contacts table if it doesn't exist
     await client.query(`
       CREATE TABLE IF NOT EXISTS contacts (
         id SERIAL PRIMARY KEY,
@@ -44,39 +41,89 @@ const initPostgresTable = async (client) => {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('PostgreSQL contacts table initialized.');
-    return true;
+    console.log('✅ PostgreSQL contacts table initialized');
+    client.release();
+    
+    // Return compatibility layer
+    return createPgCompatibilityLayer(pool);
   } catch (err) {
-    console.error('Error creating PostgreSQL table:', err);
-    return false;
+    console.error('❌ PostgreSQL connection failed:', err);
+    throw err; // Rethrow to be handled by the caller
   }
 };
 
-// SQLite compatibility layer for PostgreSQL
+// SQLite fallback for local development only
+const setupSQLiteConnection = () => {
+  if (isProduction || isVercel) {
+    console.error('❌ Attempted to use SQLite in production/Vercel environment');
+    throw new Error('SQLite is not supported in production/Vercel environment');
+  }
+  
+  console.log('Setting up SQLite for local development...');
+  const sqlite3 = require('sqlite3').verbose();
+  const dbPath = path.join(__dirname, 'contacts.db');
+  
+  // Ensure the directory exists
+  const dbDir = path.dirname(dbPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+  
+  return new Promise((resolve, reject) => {
+    const sqliteDb = new sqlite3.Database(dbPath, (err) => {
+      if (err) {
+        console.error('❌ SQLite connection failed:', err.message);
+        reject(err);
+        return;
+      }
+      
+      console.log('✅ Connected to SQLite database');
+      
+      // Create contacts table
+      sqliteDb.run(`CREATE TABLE IF NOT EXISTS contacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        phone TEXT,
+        company TEXT NOT NULL,
+        message TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )`, (err) => {
+        if (err) {
+          console.error('❌ Failed to create SQLite table:', err.message);
+          reject(err);
+        } else {
+          console.log('✅ SQLite contacts table initialized');
+          resolve(sqliteDb);
+        }
+      });
+    });
+  });
+};
+
+// PostgreSQL compatibility layer (makes PG work with SQLite interface)
 const createPgCompatibilityLayer = (pgPool) => {
   return {
     // Run query (for INSERT, UPDATE, DELETE)
     run: async (query, params, callback) => {
       try {
-        // Convert SQLite placeholders (?) to PostgreSQL placeholders ($1, $2, etc.)
+        // Convert SQLite placeholders to PostgreSQL placeholders
         let pgQuery = query;
         let paramIndex = 0;
         pgQuery = query.replace(/\?/g, () => `$${++paramIndex}`);
         
-        console.log('Executing PostgreSQL query:', pgQuery, 'with params:', params);
-        
-        // For INSERT queries that need to return the ID
+        // For INSERT queries, add RETURNING id
         if (query.trim().toUpperCase().startsWith('INSERT')) {
-          // Add RETURNING id to get the inserted ID
           if (!pgQuery.includes('RETURNING')) {
             pgQuery += ' RETURNING id';
           }
         }
         
+        console.log('PostgreSQL query:', pgQuery);
         const result = await pgPool.query(pgQuery, params);
         
         if (callback) {
-          // Simulate SQLite's this.lastID with the returned id
+          // Simulate SQLite's this.lastID
           const lastID = result.rows && result.rows[0] ? result.rows[0].id : null;
           callback.call({ lastID });
         }
@@ -91,8 +138,11 @@ const createPgCompatibilityLayer = (pgPool) => {
     // Get a single row
     get: async (query, params, callback) => {
       try {
-        // Convert SQLite placeholders (?) to PostgreSQL placeholders ($1, $2, etc.)
-        const pgQuery = query.replace(/\?/g, (_, i) => `$${i + 1}`);
+        // Convert SQLite placeholders to PostgreSQL placeholders
+        let pgQuery = query;
+        let paramIndex = 0;
+        pgQuery = query.replace(/\?/g, () => `$${++paramIndex}`);
+        
         const result = await pgPool.query(pgQuery, params);
         
         if (callback) {
@@ -109,8 +159,11 @@ const createPgCompatibilityLayer = (pgPool) => {
     // Get all rows
     all: async (query, params, callback) => {
       try {
-        // Convert SQLite placeholders (?) to PostgreSQL placeholders ($1, $2, etc.)
-        const pgQuery = query.replace(/\?/g, (_, i) => `$${i + 1}`);
+        // Convert SQLite placeholders to PostgreSQL placeholders
+        let pgQuery = query;
+        let paramIndex = 0;
+        pgQuery = query.replace(/\?/g, () => `$${++paramIndex}`);
+        
         const result = await pgPool.query(pgQuery, params);
         
         if (callback) {
@@ -126,89 +179,58 @@ const createPgCompatibilityLayer = (pgPool) => {
   };
 };
 
-// Setup database connection with proper error handling
+// Main database initialization
 (async function initializeDatabase() {
   try {
-    // Setup for Railway PostgreSQL
-    if (hasRailwayDb) {
-      console.log('Attempting to connect to Railway PostgreSQL database');
-      
-      try {
-        const pool = new Pool({
-          connectionString: process.env.DATABASE_URL,
-          ssl: {
-            rejectUnauthorized: false // This is needed for Vercel to connect to Railway
-          },
-          // Add connection pool settings
-          max: 20, // Maximum number of clients
-          idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
-          connectionTimeoutMillis: 2000 // How long to wait for a connection
-        });
-        
-        // Test connection
-        const client = await pool.connect();
-        console.log('Successfully connected to Railway PostgreSQL');
-        
-        // Initialize the table
-        await initPostgresTable(client);
-        client.release();
-        
-        // Set the database connector
-        db = createPgCompatibilityLayer(pool);
-        console.log('PostgreSQL setup complete');
-      } catch (pgError) {
-        console.error('Failed to connect to PostgreSQL, using SQLite fallback:', pgError);
-        db = setupSQLiteFallback();
+    console.log('Database initialization started...');
+    console.log('Environment:', {
+      NODE_ENV: process.env.NODE_ENV || 'development',
+      VERCEL: isVercel ? 'true' : 'false',
+      HAS_DATABASE_URL: hasRailwayDb ? 'true' : 'false'
+    });
+    
+    // Production/Vercel environment - must use PostgreSQL
+    if (isProduction || isVercel) {
+      if (!hasRailwayDb) {
+        throw new Error('DATABASE_URL environment variable is required in production/Vercel environment');
       }
+      
+      console.log('Setting up PostgreSQL for production/Vercel environment...');
+      db = await setupPostgresConnection();
     }
-    // Setup for Vercel with in-memory SQLite
-    else if (isVercel) {
-      console.log('Using in-memory SQLite database for Vercel deployment');
-      db = setupSQLiteFallback();
-    }
-    // Local development with SQLite
+    // Local development - can use PostgreSQL if available, otherwise SQLite
     else {
-      // Use file-based SQLite in development
-      const sqlite3 = require('sqlite3').verbose();
-      const dbPath = path.join(__dirname, 'contacts.db');
-      
-      // Create db directory if it doesn't exist
-      const dbDir = path.dirname(dbPath);
-      if (!fs.existsSync(dbDir)) {
-        fs.mkdirSync(dbDir, { recursive: true });
-      }
-      
-      const sqliteDb = new sqlite3.Database(dbPath, (err) => {
-        if (err) {
-          console.error('Error opening database', err.message);
-        } else {
-          console.log('Connected to the SQLite database.');
-          
-          // Create contacts table if it doesn't exist
-          sqliteDb.run(`CREATE TABLE IF NOT EXISTS contacts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            phone TEXT,
-            company TEXT NOT NULL,
-            message TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )`, (err) => {
-            if (err) {
-              console.error('Error creating table', err.message);
-            } else {
-              console.log('Contacts table initialized.');
-            }
-          });
+      if (hasRailwayDb) {
+        console.log('DATABASE_URL found in development - using PostgreSQL...');
+        try {
+          db = await setupPostgresConnection();
+        } catch (pgError) {
+          console.log('PostgreSQL failed in development, falling back to SQLite...');
+          db = await setupSQLiteConnection();
         }
-      });
-      
-      db = sqliteDb;
+      } else {
+        console.log('No DATABASE_URL found in development - using SQLite...');
+        db = await setupSQLiteConnection();
+      }
     }
+    
+    console.log('✅ Database initialization complete');
   } catch (error) {
-    console.error('Fatal database initialization error:', error);
-    // Always provide a working database even if initialization fails
-    db = setupSQLiteFallback();
+    console.error('❌ FATAL DATABASE ERROR:', error);
+    
+    // In development, try SQLite as last resort
+    if (!isProduction && !isVercel) {
+      try {
+        console.log('Attempting SQLite as last resort for development...');
+        db = await setupSQLiteConnection();
+      } catch (sqliteError) {
+        console.error('❌ Failed to initialize any database:', sqliteError);
+        throw error; // Rethrow the original error
+      }
+    } else {
+      // In production, we must fail loudly
+      throw error;
+    }
   }
 })();
 
