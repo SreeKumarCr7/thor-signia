@@ -1,0 +1,17 @@
+<svg width="250" height="40" viewBox="0 0 250 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Thor Text -->
+  <text x="0" y="30" font-family="Arial" font-weight="700" font-size="28" fill="#009898">THOR</text>
+  
+  <!-- Signia Text -->
+  <text x="85" y="30" font-family="Arial" font-weight="500" font-size="28" fill="#333333">SIGNIA</text>
+  
+  <!-- AI Icon -->
+  <g transform="translate(210, 7)">
+    <path d="M30 1C23.3726 1 18 6.37258 18 13C18 19.6274 23.3726 25 30 25C36.6274 25 42 19.6274 42 13C42 6.37258 36.6274 1 30 1ZM30 4C35.0751 4 39 7.92487 39 13C39 18.0751 35.0751 22 30 22C24.9249 22 21 18.0751 21 13C21 7.92487 24.9249 4 30 4Z" fill="#88bf42"/>
+    <path d="M27 18L27 8L29.5 8L29.5 15.5L34.5 15.5L34.5 18L27 18Z" fill="#009898"/>
+    <path d="M33 8V10.5H30.5V8H33Z" fill="#009898"/>
+  </g>
+  
+  <!-- Connector Line -->
+  <rect x="70" y="10" width="2" height="20" fill="#88bf42"/>
+</svg> 

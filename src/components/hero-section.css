@@ -1,0 +1,123 @@
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes float-medium {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-15px);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+
+.animate-float-medium {
+  animation: float-medium 5s ease-in-out infinite;
+}
+
+/* Media query for small screens */
+@media (max-width: 768px) {
+  @keyframes float-slow {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-7px);
+    }
+  }
+  
+  @keyframes float-medium {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  
+  .animate-float-slow,
+  .animate-float-medium {
+    animation-duration: 4s;
+  }
+}
+
+/* Animation distance limits for smaller screens */
+@media (max-width: 480px) {
+  @keyframes float-slow {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+  
+  @keyframes float-medium {
+    0%, 100% {
+      transform: translateY(0px);
+    }
+    50% {
+      transform: translateY(-6px);
+    }
+  }
+  
+  .animate-float-slow,
+  .animate-float-medium {
+    animation-duration: 3s;
+  }
+}
+
+/* Add horizontal floating animations for more dynamic movement */
+@keyframes float-horizontal {
+  0%, 100% {
+    transform: translateX(0px);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+
+/* Prevent animations from causing layout shifts */
+#hero-section-content .relative {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  will-change: transform;
+}
+
+/* Ensure SVG elements scale properly */
+#hero-section-content svg {
+  overflow: visible;
+}
+
+/* Improve positioning on ultra-small screens */
+@media (max-width: 360px) {
+  #hero-section-content .relative {
+    transform: scale(0.9);
+  }
+}
+
+/* Sticky header behavior when scrolling up */
+.sticky-top {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  transition: all 0.3s ease;
+}
+
+/* Hero section responsive height adjustments */
+@media (max-width: 768px) {
+  #hero-section-content {
+    min-height: auto;
+    padding-top: 5rem;
+    padding-bottom: 3rem;
+  }
+} 
