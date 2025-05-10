@@ -193,6 +193,81 @@ app.get('/api/debug-database', async (req, res) => {
   }
 });
 
+// PostgreSQL permissions check endpoint
+app.get('/api/debug-pg-permissions', async (req, res) => {
+  try {
+    const { Pool } = require('pg');
+    
+    if (!process.env.DATABASE_URL) {
+      return res.status(400).json({
+        error: 'No DATABASE_URL environment variable set'
+      });
+    }
+    
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    });
+    
+    // Connect directly to PostgreSQL
+    const client = await pool.connect();
+    console.log('Connected to PostgreSQL for permissions check');
+    
+    try {
+      // Basic connection test
+      const result = await client.query('SELECT current_user, current_database()');
+      const user = result.rows[0];
+      
+      // Check schema permissions
+      const schemaPerms = await client.query(`
+        SELECT schema_name, has_schema_privilege(current_user, schema_name, 'CREATE') as can_create,
+               has_schema_privilege(current_user, schema_name, 'USAGE') as can_use
+        FROM information_schema.schemata
+        WHERE schema_name = 'public'
+      `);
+      
+      // Try to create a test table
+      let createTableResult = { success: false, error: null };
+      try {
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS public.test_permissions (
+            id SERIAL PRIMARY KEY,
+            test_col TEXT
+          )
+        `);
+        createTableResult.success = true;
+      } catch (err) {
+        createTableResult.error = err.message;
+      }
+      
+      // List existing tables
+      const tables = await client.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public'
+      `);
+      
+      res.json({
+        connection: 'success',
+        user: user,
+        schema_permissions: schemaPerms.rows,
+        create_table_test: createTableResult,
+        existing_tables: tables.rows.map(t => t.table_name),
+        database_url_preview: process.env.DATABASE_URL.substring(0, 15) + '...'
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('PostgreSQL permissions check error:', error);
+    res.status(500).json({
+      connection: 'error',
+      message: error.message,
+      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+    });
+  }
+});
+
 // Initialize routes with proper error handling
 app.get('/', (req, res) => {
   res.json({ message: 'Thor Signia API is running' });

@@ -20,7 +20,7 @@ module.exports = (req, res, next) => {
             return res.status(400).json({ error: 'Missing required fields' });
           }
           
-          const sql = `INSERT INTO contacts (name, email, phone, company, message) 
+          const sql = `INSERT INTO public.contacts (name, email, phone, company, message) 
                      VALUES (?, ?, ?, ?, ?)`;
           
           try {
@@ -94,7 +94,7 @@ module.exports = (req, res, next) => {
             return res.status(403).json({ error: 'Access restricted in production' });
           }
           
-          db.all('SELECT * FROM contacts ORDER BY created_at DESC', [], (err, rows) => {
+          db.all('SELECT * FROM public.contacts ORDER BY created_at DESC', [], (err, rows) => {
             if (err) {
               console.error(err.message);
               return res.status(500).json({ error: 'Failed to retrieve contacts' });
@@ -117,7 +117,7 @@ module.exports = (req, res, next) => {
           }
           
           const id = req.params.id;
-          db.get('SELECT * FROM contacts WHERE id = ?', [id], (err, row) => {
+          db.get('SELECT * FROM public.contacts WHERE id = ?', [id], (err, row) => {
             if (err) {
               console.error(err.message);
               return res.status(500).json({ error: 'Failed to retrieve contact' });

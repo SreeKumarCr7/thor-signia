@@ -29,20 +29,39 @@ const setupPostgresConnection = async () => {
     const client = await pool.connect();
     console.log('✅ Successfully connected to PostgreSQL database');
     
-    // Create the contacts table if it doesn't exist
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS contacts (
-        id SERIAL PRIMARY KEY,
-        name TEXT NOT NULL,
-        email TEXT NOT NULL,
-        phone TEXT,
-        company TEXT NOT NULL,
-        message TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    console.log('✅ PostgreSQL contacts table initialized');
-    client.release();
+    try {
+      // First check if the table already exists
+      const tableCheck = await client.query(
+        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'contacts')"
+      );
+      
+      const tableExists = tableCheck.rows[0].exists;
+      console.log(`Table check result: ${tableExists ? 'Table exists' : 'Table does not exist'}`);
+      
+      if (!tableExists) {
+        // Create the contacts table if it doesn't exist
+        console.log('Creating contacts table in public schema...');
+        await client.query(`
+          CREATE TABLE public.contacts (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            phone TEXT,
+            company TEXT NOT NULL,
+            message TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `);
+        console.log('✅ PostgreSQL contacts table created successfully');
+      } else {
+        console.log('✅ PostgreSQL contacts table already exists');
+      }
+    } catch (tableError) {
+      console.error('Error working with contacts table:', tableError);
+      throw tableError;
+    } finally {
+      client.release();
+    }
     
     // Return compatibility layer
     return createPgCompatibilityLayer(pool);
@@ -103,6 +122,13 @@ const setupSQLiteConnection = () => {
 
 // PostgreSQL compatibility layer (makes PG work with SQLite interface)
 const createPgCompatibilityLayer = (pgPool) => {
+  // Helper to ensure all table references use public schema
+  const ensurePublicSchema = (query) => {
+    // Regular expression to match table names not prefixed with a schema
+    // This regex looks for table names in common SQL operations
+    return query.replace(/\b(FROM|JOIN|UPDATE|INTO|TABLE)\s+(?!public\.)(\w+)/gi, '$1 public.$2');
+  };
+
   return {
     // Run query (for INSERT, UPDATE, DELETE)
     run: async (query, params, callback) => {
@@ -111,6 +137,9 @@ const createPgCompatibilityLayer = (pgPool) => {
         let pgQuery = query;
         let paramIndex = 0;
         pgQuery = query.replace(/\?/g, () => `$${++paramIndex}`);
+        
+        // Ensure public schema is used
+        pgQuery = ensurePublicSchema(pgQuery);
         
         // For INSERT queries, add RETURNING id
         if (query.trim().toUpperCase().startsWith('INSERT')) {
@@ -143,6 +172,9 @@ const createPgCompatibilityLayer = (pgPool) => {
         let paramIndex = 0;
         pgQuery = query.replace(/\?/g, () => `$${++paramIndex}`);
         
+        // Ensure public schema is used
+        pgQuery = ensurePublicSchema(pgQuery);
+        
         const result = await pgPool.query(pgQuery, params);
         
         if (callback) {
@@ -163,6 +195,9 @@ const createPgCompatibilityLayer = (pgPool) => {
         let pgQuery = query;
         let paramIndex = 0;
         pgQuery = query.replace(/\?/g, () => `$${++paramIndex}`);
+        
+        // Ensure public schema is used
+        pgQuery = ensurePublicSchema(pgQuery);
         
         const result = await pgPool.query(pgQuery, params);
         
