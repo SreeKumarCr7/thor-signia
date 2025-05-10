@@ -83,6 +83,116 @@ app.get('/api/debug', async (req, res) => {
   }
 });
 
+// Enhanced debug route with more diagnostic information
+app.get('/api/debug-database', async (req, res) => {
+  try {
+    // Don't require database module until route is called
+    const db = require('./db/database');
+    
+    // Basic environment info
+    const envInfo = {
+      NODE_ENV: process.env.NODE_ENV || 'development',
+      VERCEL: process.env.VERCEL === '1',
+      HAS_DATABASE_URL: !!process.env.DATABASE_URL,
+      DATABASE_TYPE: process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite'
+    };
+    
+    // Check if database is functioning
+    const dbStatus = { initialized: !!db };
+    
+    // Test table existence
+    let tableExists = false;
+    let tableContent = null;
+    let errorDetails = null;
+    
+    try {
+      // Try to check if the contacts table exists and get a sample row
+      if (process.env.DATABASE_URL) {
+        // PostgreSQL approach
+        const tableCheck = await new Promise((resolve, reject) => {
+          db.all(
+            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'contacts') as exists", 
+            [], 
+            (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            }
+          );
+        });
+        tableExists = tableCheck && tableCheck[0] && tableCheck[0].exists;
+      } else {
+        // SQLite approach
+        const tableCheck = await new Promise((resolve, reject) => {
+          db.all(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='contacts'", 
+            [], 
+            (err, rows) => {
+              if (err) reject(err);
+              else resolve(rows.length > 0);
+            }
+          );
+        });
+        tableExists = tableCheck;
+      }
+      
+      // If table exists, try to get a count of rows
+      if (tableExists) {
+        const rowCount = await new Promise((resolve, reject) => {
+          db.get("SELECT COUNT(*) as count FROM contacts", [], (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          });
+        });
+        
+        // Get the most recent submission (if any)
+        const recentSubmission = await new Promise((resolve, reject) => {
+          db.get(
+            "SELECT * FROM contacts ORDER BY created_at DESC LIMIT 1", 
+            [], 
+            (err, row) => {
+              if (err) reject(err);
+              else resolve(row);
+            }
+          );
+        });
+        
+        tableContent = {
+          rowCount: rowCount?.count || 0,
+          recentSubmission: recentSubmission ? {
+            id: recentSubmission.id,
+            name: recentSubmission.name,
+            email: recentSubmission.email,
+            // Exclude other fields for privacy
+            created_at: recentSubmission.created_at
+          } : null
+        };
+      }
+    } catch (dbError) {
+      errorDetails = {
+        message: dbError.message,
+        stack: process.env.NODE_ENV !== 'production' ? dbError.stack : undefined
+      };
+    }
+    
+    res.json({
+      environment: envInfo,
+      database: dbStatus,
+      table: {
+        exists: tableExists,
+        content: tableContent
+      },
+      error: errorDetails
+    });
+  } catch (error) {
+    console.error('Database debug error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error.message,
+      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+    });
+  }
+});
+
 // Initialize routes with proper error handling
 app.get('/', (req, res) => {
   res.json({ message: 'Thor Signia API is running' });

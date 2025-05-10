@@ -59,12 +59,26 @@ const createPgCompatibilityLayer = (pgPool) => {
     run: async (query, params, callback) => {
       try {
         // Convert SQLite placeholders (?) to PostgreSQL placeholders ($1, $2, etc.)
-        const pgQuery = query.replace(/\?/g, (_, i) => `$${i + 1}`);
+        let pgQuery = query;
+        let paramIndex = 0;
+        pgQuery = query.replace(/\?/g, () => `$${++paramIndex}`);
+        
+        console.log('Executing PostgreSQL query:', pgQuery, 'with params:', params);
+        
+        // For INSERT queries that need to return the ID
+        if (query.trim().toUpperCase().startsWith('INSERT')) {
+          // Add RETURNING id to get the inserted ID
+          if (!pgQuery.includes('RETURNING')) {
+            pgQuery += ' RETURNING id';
+          }
+        }
+        
         const result = await pgPool.query(pgQuery, params);
         
         if (callback) {
-          // Simulate SQLite's this.lastID
-          callback.call({ lastID: result.rows[0]?.id || 0 });
+          // Simulate SQLite's this.lastID with the returned id
+          const lastID = result.rows && result.rows[0] ? result.rows[0].id : null;
+          callback.call({ lastID });
         }
         return result;
       } catch (err) {
