@@ -2,7 +2,6 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
-const contactRoutes = require('./routes/contacts');
 
 // Initialize express app
 const app = express();
@@ -21,54 +20,84 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-// Health check route
+// Basic error handling for all routes
+app.use((req, res, next) => {
+  try {
+    next();
+  } catch (err) {
+    console.error('Uncaught error in middleware:', err);
+    res.status(500).json({ error: 'Server error', message: 'An unexpected error occurred' });
+  }
+});
+
+// Health check route - does not require database
 app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'ok',
     environment: process.env.NODE_ENV || 'development',
-    database: process.env.DATABASE_URL ? 'Railway PostgreSQL' : 'SQLite'
+    database_type: process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite',
+    vercel: process.env.VERCEL === '1'
   });
 });
 
-// Debug route
+// Debug route - with database check
 app.get('/api/debug', async (req, res) => {
   try {
+    // Don't require database module until route is called
     const db = require('./db/database');
     
-    if (process.env.DATABASE_URL) {
-      // PostgreSQL test
-      const result = await db.all('SELECT NOW() as time', []);
-      res.json({
-        status: 'ok',
-        database: 'PostgreSQL',
-        connection: 'active',
-        time: result
-      });
-    } else {
-      // SQLite test
-      db.all('SELECT datetime() as time', [], (err, rows) => {
-        if (err) {
-          throw new Error(`Database query error: ${err.message}`);
-        }
-        res.json({
-          status: 'ok',
-          database: 'SQLite',
-          connection: 'active',
-          time: rows
+    // Simple query that works in both PostgreSQL and SQLite
+    const query = process.env.DATABASE_URL 
+      ? 'SELECT 1 as connected'  // PostgreSQL
+      : 'SELECT 1 as connected'; // SQLite
+    
+    // Use a Promise to handle both async (pg) and callback (sqlite) patterns
+    const result = await new Promise((resolve, reject) => {
+      if (process.env.DATABASE_URL) {
+        // PostgreSQL uses async/await pattern
+        db.all(query, [])
+          .then(results => resolve(results))
+          .catch(err => reject(err));
+      } else {
+        // SQLite uses callback pattern
+        db.all(query, [], (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
         });
-      });
-    }
+      }
+    });
+    
+    res.json({
+      status: 'ok',
+      database: process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite',
+      connection: 'active',
+      result: result
+    });
   } catch (error) {
-    console.error('Debug route error:', error);
+    console.error('Database connection error:', error);
     res.status(500).json({
       status: 'error',
-      message: error.message
+      message: error.message,
+      database_type: process.env.DATABASE_URL ? 'PostgreSQL' : 'SQLite'
     });
   }
 });
 
-// Contact form routes
-app.use('/api/contacts', contactRoutes);
+// Initialize routes with proper error handling
+app.get('/', (req, res) => {
+  res.json({ message: 'Thor Signia API is running' });
+});
+
+// Contact form routes (lazy-loaded to prevent errors during startup)
+app.use('/api/contacts', (req, res, next) => {
+  try {
+    const contactRoutes = require('./routes/contacts');
+    contactRoutes(req, res, next);
+  } catch (err) {
+    console.error('Error loading contact routes:', err);
+    res.status(500).json({ error: 'Server configuration error' });
+  }
+});
 
 // Global error handler
 app.use((err, req, res, next) => {
