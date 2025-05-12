@@ -28,6 +28,7 @@
   ],
   "env": {
     "VERCEL": "1",
-    "FLASK_ENV": "production"
+    "FLASK_ENV": "production",
+    "PORT": "5000"
   }
 } 
