@@ -35,6 +35,11 @@ def create_app():
         # Create database tables (if they don't exist)
         db.create_all()
         
+        # Add a basic API health check route
+        @app.route('/api/health')
+        def health_check():
+            return {'status': 'ok', 'message': 'Thor Signia API is running'}
+        
         # Serve frontend in production
         @app.route('/')
         def index():

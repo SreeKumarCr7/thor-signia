@@ -6,22 +6,28 @@
       "use": "@vercel/python"
     },
     {
-      "src": "dist/**",
-      "use": "@vercel/static"
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "wsgi.py"
+      "dest": "/wsgi.py"
+    },
+    {
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "dist/$1"
+      "dest": "/index.html"
     }
   ],
   "env": {
     "VERCEL": "1",
-    "NODE_ENV": "production"
+    "FLASK_ENV": "production"
   }
 } 
