@@ -23,8 +23,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-// Use API URL from config
-const API_URL = config.apiUrl;
+// Use API URL from config or fallback to current origin for API calls
+const API_URL = config.apiUrl || window.location.origin;
 
 const ContactPage = () => {
   const { toast } = useToast();
@@ -48,17 +48,30 @@ const ContactPage = () => {
     setIsSubmitting(true);
     
     try {
+      console.log(`Submitting form to ${API_URL}/api/contacts`);
+      
       const response = await fetch(`${API_URL}/api/contacts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify(formData),
+        // Add these options to help with CORS and connection issues
+        mode: 'cors',
+        credentials: 'same-origin',
       });
       
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('Error parsing JSON response:', jsonError);
+        throw new Error('Failed to parse server response');
+      }
       
       if (response.ok) {
+        console.log('Form submission successful:', data);
         toast({
           title: "Message Sent Successfully",
           description: "Thank you for reaching out. Our team will contact you shortly.",
@@ -74,13 +87,14 @@ const ContactPage = () => {
           message: '',
         });
       } else {
-        throw new Error(data.error || 'Failed to send message');
+        console.error('Server error:', data);
+        throw new Error(data?.error || `Server error: ${response.status}`);
       }
     } catch (error) {
       console.error('Error submitting form:', error);
       toast({
         title: "Error Sending Message",
-        description: error instanceof Error ? error.message : "Please try again later.",
+        description: error instanceof Error ? error.message : "Failed to contact server. Please try again later or contact us directly.",
         variant: "destructive",
       });
     } finally {
