@@ -15,7 +15,6 @@ import ServicesPage from "./pages/Services";
 import CaseStudiesPage from "./pages/CaseStudies";
 import CaseStudyDetail from "./pages/CaseStudyDetail";
 import NotFound from "./pages/NotFound";
-import ContactDebugPage from "./pages/ContactDebug";
 
 const queryClient = new QueryClient();
 
@@ -29,7 +28,6 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/contact" element={<ContactPage />} />
-          <Route path="/contact-debug" element={<ContactDebugPage />} />
           <Route path="/ai-engineers" element={<AIEngineersPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/awards" element={<AwardsPage />} />
