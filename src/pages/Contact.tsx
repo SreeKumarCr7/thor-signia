@@ -23,8 +23,8 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-// Use API URL from config or fallback to current origin for API calls
-const API_URL = config.apiUrl || window.location.origin;
+// Use a relative API path instead of full URL to avoid CORS issues
+const API_PATH = '/api/contacts';
 
 const ContactPage = () => {
   const { toast } = useToast();
@@ -48,18 +48,17 @@ const ContactPage = () => {
     setIsSubmitting(true);
     
     try {
-      console.log(`Submitting form to ${API_URL}/api/contacts`);
+      console.log(`Submitting form to ${API_PATH}`);
       
-      const response = await fetch(`${API_URL}/api/contacts`, {
+      const response = await fetch(API_PATH, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
         body: JSON.stringify(formData),
-        // Add these options to help with CORS and connection issues
-        mode: 'cors',
-        credentials: 'same-origin',
+        // Don't use credentials for cross-origin
+        credentials: 'omit',
       });
       
       let data;

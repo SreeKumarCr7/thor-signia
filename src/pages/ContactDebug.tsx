@@ -5,10 +5,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { config } from '@/config/env';
 import { Send } from 'lucide-react';
 
-// Hardcoded API URLs for testing - try both
-const LOCAL_API_URL = 'http://localhost:5000';
-const DEPLOYED_API_URL = window.location.origin;
-const MOCK_API_URL = window.location.origin + '/api/mock-contact';
+// Test various API paths
+const RELATIVE_API_PATH = '/api/contacts';
+const ALTERNATE_API_PATH = '/api/mock-contact';
+const ORIGIN_API_PATH = window.location.origin + '/api/contacts';
+const API_HEALTH_PATH = '/api/health';
 
 const ContactDebugPage = () => {
   const [formData, setFormData] = useState({
@@ -21,7 +22,7 @@ const ContactDebugPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedApiUrl, setSelectedApiUrl] = useState(DEPLOYED_API_URL);
+  const [selectedApiPath, setSelectedApiPath] = useState(RELATIVE_API_PATH);
 
   const handleChange = (e: any) => {
     const { name, value } = e.target;
@@ -32,7 +33,8 @@ const ContactDebugPage = () => {
     setError(null);
     setResult(null);
     try {
-      const response = await fetch(`${url}/api/health`);
+      // Use relative path for health check
+      const response = await fetch(API_HEALTH_PATH);
       const data = await response.json();
       setResult({ 
         message: `Connection successful: ${JSON.stringify(data)}`,
@@ -53,25 +55,26 @@ const ContactDebugPage = () => {
     setResult(null);
     
     try {
-      console.log(`Submitting to: ${selectedApiUrl}/api/contacts`);
+      console.log(`Submitting to: ${selectedApiPath}`);
       console.log('Form data:', JSON.stringify(formData));
       
       // Test connection first
-      const isConnected = await testConnection(selectedApiUrl);
+      const isConnected = await testConnection(selectedApiPath);
       if (!isConnected) {
-        setError(`Cannot connect to API at ${selectedApiUrl}`);
+        setError(`Cannot connect to API health check endpoint`);
         setIsSubmitting(false);
         return;
       }
       
       // Make the actual form submission
-      const response = await fetch(`${selectedApiUrl}/api/contacts`, {
+      const response = await fetch(selectedApiPath, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
         body: JSON.stringify(formData),
+        credentials: 'omit', // Don't send credentials
       });
       
       let responseData;
@@ -102,19 +105,20 @@ const ContactDebugPage = () => {
     }
   };
   
-  // Try mock endpoint to verify CORS is working
+  // Try mock endpoint to verify API connectivity
   const testMockEndpoint = async () => {
     setIsSubmitting(true);
     setError(null);
     setResult(null);
     
     try {
-      const response = await fetch(MOCK_API_URL, {
+      const response = await fetch(ALTERNATE_API_PATH, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(formData),
+        credentials: 'omit',
       });
       
       const data = await response.json();
@@ -137,37 +141,48 @@ const ContactDebugPage = () => {
       <h1 className="text-3xl font-bold mb-8">Contact Form Debugging</h1>
       
       <div className="bg-gray-100 p-6 rounded-lg mb-8">
-        <h2 className="text-xl font-semibold mb-4">API URL Selection</h2>
+        <h2 className="text-xl font-semibold mb-4">API Path Selection</h2>
         <div className="space-y-2">
           <div>
             <label className="flex items-center space-x-2">
               <input
                 type="radio"
-                checked={selectedApiUrl === DEPLOYED_API_URL}
-                onChange={() => setSelectedApiUrl(DEPLOYED_API_URL)}
+                checked={selectedApiPath === RELATIVE_API_PATH}
+                onChange={() => setSelectedApiPath(RELATIVE_API_PATH)}
                 className="form-radio"
               />
-              <span>Deployed API ({DEPLOYED_API_URL})</span>
+              <span>Relative API Path ({RELATIVE_API_PATH})</span>
             </label>
           </div>
           <div>
             <label className="flex items-center space-x-2">
               <input
                 type="radio"
-                checked={selectedApiUrl === LOCAL_API_URL}
-                onChange={() => setSelectedApiUrl(LOCAL_API_URL)}
+                checked={selectedApiPath === ALTERNATE_API_PATH}
+                onChange={() => setSelectedApiPath(ALTERNATE_API_PATH)}
                 className="form-radio"
               />
-              <span>Local API ({LOCAL_API_URL})</span>
+              <span>Mock API Path ({ALTERNATE_API_PATH})</span>
+            </label>
+          </div>
+          <div>
+            <label className="flex items-center space-x-2">
+              <input
+                type="radio"
+                checked={selectedApiPath === ORIGIN_API_PATH}
+                onChange={() => setSelectedApiPath(ORIGIN_API_PATH)}
+                className="form-radio"
+              />
+              <span>Full URL Path ({ORIGIN_API_PATH})</span>
             </label>
           </div>
           <div className="mt-4">
             <Button
-              onClick={() => testConnection(selectedApiUrl)}
+              onClick={() => testConnection(selectedApiPath)}
               variant="outline"
               className="mr-2"
             >
-              Test Connection
+              Test API Health
             </Button>
             <Button
               onClick={testMockEndpoint}
@@ -269,7 +284,10 @@ const ContactDebugPage = () => {
               {JSON.stringify({
                 origin: window.location.origin,
                 apiUrl: config.apiUrl,
-                selectedApiUrl,
+                selectedApiPath,
+                relativePath: RELATIVE_API_PATH,
+                mockPath: ALTERNATE_API_PATH,
+                healthPath: API_HEALTH_PATH
               }, null, 2)}
             </pre>
           </div>
