@@ -72,10 +72,18 @@ def sanitize_input(text):
     # Remove potentially dangerous characters
     return re.sub(r'[<>\'";]', '', text)
 
-@bp.route('', methods=['POST'])
+@bp.route('', methods=['POST', 'OPTIONS'])
 @rate_limit
 def create_contact():
     """Create a new contact submission."""
+    # Handle preflight CORS requests
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'POST')
+        return response
+        
     try:
         # Get form data
         data = request.get_json()
@@ -142,17 +150,24 @@ def create_contact():
         # Backup the submission - don't block on this
         backup_result = EmailService.backup_submission(contact_data)
         
-        return jsonify({
+        # Create response with proper CORS headers
+        response = jsonify({
             'id': new_contact.id,
             'message': 'Contact saved successfully',
             'emailSent': email_result.get('success', False),
             'backupCreated': backup_result.get('success', False)
-        }), 201
+        })
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 201
         
     except Exception as e:
         logger.exception("Error processing contact submission")
         db.session.rollback()
-        return jsonify({"error": "Failed to save contact"}), 500
+        
+        # Return error with proper CORS headers
+        response = jsonify({"error": "Failed to save contact"})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
 
 @bp.route('', methods=['GET'])
 def get_contacts():
@@ -163,11 +178,19 @@ def get_contacts():
             return jsonify({"error": "Access restricted in production"}), 403
         
         contacts = Contact.query.order_by(Contact.created_at.desc()).all()
-        return jsonify([contact.to_dict() for contact in contacts])
+        
+        # Return with proper CORS headers
+        response = jsonify([contact.to_dict() for contact in contacts])
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
         
     except Exception as e:
         logger.exception("Error retrieving contacts")
-        return jsonify({"error": "Failed to retrieve contacts"}), 500
+        
+        # Return error with proper CORS headers
+        response = jsonify({"error": "Failed to retrieve contacts"})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
 
 @bp.route('/<int:id>', methods=['GET'])
 def get_contact(id):
@@ -179,19 +202,32 @@ def get_contact(id):
         
         contact = Contact.query.get(id)
         if not contact:
-            return jsonify({"error": "Contact not found"}), 404
+            # Return error with proper CORS headers
+            response = jsonify({"error": "Contact not found"})
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response, 404
             
-        return jsonify(contact.to_dict())
+        # Return with proper CORS headers
+        response = jsonify(contact.to_dict())
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response
         
     except Exception as e:
         logger.exception(f"Error retrieving contact {id}")
-        return jsonify({"error": "Failed to retrieve contact"}), 500
+        
+        # Return error with proper CORS headers
+        response = jsonify({"error": "Failed to retrieve contact"})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        return response, 500
 
 # Health check route
 @bp.route('/health', methods=['GET'])
 def health_check():
     """Simple route to check if the API is running."""
-    return jsonify({
+    # Return with proper CORS headers
+    response = jsonify({
         "status": "ok",
         "service": "contacts-api"
-    }) 
+    })
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    return response 

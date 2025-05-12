@@ -30,19 +30,8 @@ def create_app():
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 hour
     
-    # Configure CORS with proper settings
-    cors_origins = os.getenv('CORS_ORIGINS', '*')
-    if cors_origins == '*' and os.getenv('FLASK_ENV') == 'production':
-        logger.warning("CORS is set to allow all origins (*) in production. This is not recommended.")
-    
-    CORS(app, resources={
-        r"/api/*": {
-            "origins": cors_origins.split(','),
-            "methods": ["GET", "POST"],
-            "allow_headers": ["Content-Type", "Authorization"],
-            "max_age": 3600
-        }
-    })
+    # Configure CORS to allow requests from any origin
+    CORS(app, resources={r"/*": {"origins": "*"}})
     
     # Configure the database to use SQLite regardless of environment
     # for demo purposes (avoiding psycopg2 dependency)
@@ -54,11 +43,15 @@ def create_app():
     # Security headers middleware
     @app.after_request
     def add_security_headers(response):
-        response.headers['Content-Security-Policy'] = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'"
+        # Add security headers, but allow cross-origin requests
         response.headers['X-Content-Type-Options'] = 'nosniff'
-        response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-XSS-Protection'] = '1; mode=block'
-        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+        
+        # Set CORS headers to ensure they aren't overridden
+        response.headers['Access-Control-Allow-Origin'] = '*'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        
         return response
     
     # Initialize plugins

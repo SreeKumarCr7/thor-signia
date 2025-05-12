@@ -30,6 +30,7 @@ lerna-debug.log*
 
 # Backup data
 server/data/
+app/data/contact_submissions.json
 
 # Editor directories and files
 .vscode/*
