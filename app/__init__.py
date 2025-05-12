@@ -4,6 +4,7 @@ from flask_sqlalchemy import SQLAlchemy
 from dotenv import load_dotenv
 import os
 import logging
+import urllib.parse
 
 # Configure logging
 logging.basicConfig(
@@ -33,9 +34,17 @@ def create_app():
     # Configure CORS to allow requests from any origin
     CORS(app, resources={r"/*": {"origins": "*"}})
     
-    # Configure the database to use SQLite regardless of environment
-    # for demo purposes (avoiding psycopg2 dependency)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///contacts.db'
+    # Configure the database - Use Railway PostgreSQL if available, otherwise SQLite
+    database_url = os.getenv('DATABASE_URL')
+    if database_url and database_url.startswith('postgres://'):
+        # Railway provides PostgreSQL URLs starting with postgres://, but SQLAlchemy expects postgresql://
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+        logger.info("Using PostgreSQL database")
+    else:
+        # Fallback to SQLite for local development
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///contacts.db'
+        logger.info("Using SQLite database")
     
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['JSON_SORT_KEYS'] = False
@@ -50,7 +59,7 @@ def create_app():
         # Set CORS headers to ensure they aren't overridden
         response.headers['Access-Control-Allow-Origin'] = '*'
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS, POST, PUT, DELETE'
         
         return response
     

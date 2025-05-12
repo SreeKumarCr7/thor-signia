@@ -62,7 +62,7 @@ The backend provides the following endpoints:
 The application uses multiple layers of storage to ensure data is not lost:
 
 1. **PostgreSQL Database**:
-   - In development: Local SQLite database
+   - In development: Fallback to local SQLite database if PostgreSQL not configured
    - In production: Railway PostgreSQL database
 
 2. **Email Notifications**:
@@ -73,6 +73,32 @@ The application uses multiple layers of storage to ensure data is not lost:
    - JSON file backup stored in `app/data/contact_submissions.json`
    - Not available in production due to read-only filesystem
 
+## Railway PostgreSQL Setup
+
+To use Railway's PostgreSQL database:
+
+1. Create a PostgreSQL database in Railway:
+   - Go to [Railway](https://railway.app)
+   - Create a new project or select an existing one
+   - Add a PostgreSQL database service
+   - After it's provisioned, go to the Variables tab to get your DATABASE_URL
+
+2. Add the DATABASE_URL to your environment variables:
+   - For local development: Add it to your `.env` file
+   - For Vercel: Add it as an environment variable in your project settings
+   - For Railway: Already available via the shared variables feature
+
+3. Run the database setup script to create tables:
+   ```bash
+   # Make sure you have the DATABASE_URL in your environment or .env
+   python setup_railway_db.py
+   ```
+
+4. To migrate existing data from SQLite to PostgreSQL:
+   ```bash
+   python setup_railway_db.py --migrate
+   ```
+
 ## Railway Deployment
 
 This project is configured for deployment on Railway:
@@ -82,6 +108,8 @@ This project is configured for deployment on Railway:
 2. Connect the GitHub repository to Railway:
    - Go to [Railway](https://railway.app)
    - Import your repository
+   - Add a PostgreSQL database service
+   - Link the database to your web service
    - Configure environment variables (see below)
    - Deploy
 
