@@ -32,6 +32,16 @@ lerna-debug.log*
 server/data/
 app/data/contact_submissions.json
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+htmlcov/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
