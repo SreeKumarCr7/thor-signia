@@ -6,7 +6,7 @@ import re
 class Contact(db.Model):
     """Contact form submission model."""
     
-    __tablename__ = 'contacts'
+    __tablename__ = 'contact'
     
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)

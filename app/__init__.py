@@ -36,11 +36,30 @@ def create_app():
     
     # Configure the database - Use Railway PostgreSQL if available, otherwise SQLite
     database_url = os.getenv('DATABASE_URL')
-    if database_url and database_url.startswith('postgres://'):
-        # Railway provides PostgreSQL URLs starting with postgres://, but SQLAlchemy expects postgresql://
-        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    
+    # If DATABASE_URL is not provided, try to construct it from individual components
+    if not database_url:
+        pg_user = os.getenv('POSTGRES_USER')
+        pg_password = os.getenv('POSTGRES_PASSWORD')
+        pg_host = os.getenv('PGHOST')
+        pg_port = os.getenv('PGPORT')
+        pg_db = os.getenv('POSTGRES_DB')
+        
+        # If all PostgreSQL environment variables are set, construct the DATABASE_URL
+        if pg_user and pg_password and pg_host and pg_port and pg_db:
+            # URL encode the password to handle special characters
+            encoded_password = urllib.parse.quote_plus(pg_password)
+            database_url = f"postgresql://{pg_user}:{encoded_password}@{pg_host}:{pg_port}/{pg_db}"
+            logger.info(f"Constructed PostgreSQL URL from environment variables for host: {pg_host}")
+    
+    # Configure SQLAlchemy with the database URL
+    if database_url:
+        # Convert postgres:// to postgresql:// if necessary
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+            
         app.config['SQLALCHEMY_DATABASE_URI'] = database_url
-        logger.info("Using PostgreSQL database")
+        logger.info(f"Using PostgreSQL database at {database_url.split('@')[1].split('/')[0] if '@' in database_url else 'unknown host'}")
     else:
         # Fallback to SQLite for local development
         app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///contacts.db'
