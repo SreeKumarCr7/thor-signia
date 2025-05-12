@@ -2,15 +2,15 @@
 
 ## Overview
 
-This is the codebase for the Thor Signia website, a React-based frontend with an Express backend for handling contact form submissions.
+This is the codebase for the Thor Signia website, a React-based frontend with a Flask Python backend for handling contact form submissions.
 
 ## Features
 
 - Modern React frontend with TailwindCSS
-- Express.js backend with SQLite database
+- Flask backend with PostgreSQL database
 - Contact form with secure email notifications
 - Form submission backups for data security
-- Ready for Vercel deployment
+- Ready for Vercel/Railway deployment
 
 ## Getting Started
 
@@ -18,28 +18,34 @@ This is the codebase for the Thor Signia website, a React-based frontend with an
 
 - Node.js (v14 or higher)
 - npm (v6 or higher)
+- Python 3.8 or higher
+- pip
 
 ### Installation
 
 1. Clone the repository
-2. Install dependencies:
+2. Install frontend dependencies:
    ```bash
    npm install
    ```
 
-3. Run the development server:
+3. Install backend dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Run the development server:
    ```bash
    # Frontend only
    npm run dev
    
    # Backend only
-   npm run server
+   python app.py
    
-   # Frontend and backend together
-   npm run dev:full
+   # For both, run each in separate terminals
    ```
 
-4. Build for production:
+5. Build for production:
    ```bash
    npm run build
    ```
@@ -49,43 +55,44 @@ This is the codebase for the Thor Signia website, a React-based frontend with an
 The backend provides the following endpoints:
 
 - `POST /api/contacts` - Create a new contact submission (Form submissions)
+- `GET /api/contacts/health` - Health check endpoint
 
 ## Database & Storage
 
 The application uses multiple layers of storage to ensure data is not lost:
 
-1. **SQLite Database**:
-   - In development: File-based SQLite database at `server/db/contacts.db`
-   - In Vercel production: In-memory SQLite database
+1. **PostgreSQL Database**:
+   - In development: Local SQLite database
+   - In production: Railway PostgreSQL database
 
 2. **Email Notifications**:
    - Each form submission sends a detailed email notification
    - Ensures you receive all submissions even if database resets
 
 3. **Local Backup (Development only)**:
-   - JSON file backup stored in `server/data/contact_submissions.json`
-   - Not available in Vercel production due to read-only filesystem
+   - JSON file backup stored in `app/data/contact_submissions.json`
+   - Not available in production due to read-only filesystem
 
-## Vercel Deployment
+## Railway Deployment
 
-This project is configured for serverless deployment on Vercel:
+This project is configured for deployment on Railway:
 
 1. Push this repository to GitHub
 
-2. Connect the GitHub repository to Vercel:
-   - Go to [Vercel](https://vercel.com)
+2. Connect the GitHub repository to Railway:
+   - Go to [Railway](https://railway.app)
    - Import your repository
    - Configure environment variables (see below)
    - Deploy
 
-## Environment Variables for Vercel
+## Environment Variables
 
-Configure these environment variables in your Vercel project:
+Configure these environment variables in your Railway project:
 
 ```
-# Vercel Configuration
-VERCEL=1
-NODE_ENV=production
+# Flask Configuration
+FLASK_ENV=production
+PORT=5000
 
 # Email Configuration
 EMAIL_HOST=smtp.example.com
@@ -95,13 +102,16 @@ EMAIL_USER=your-email@example.com
 EMAIL_PASS=your-password
 EMAIL_FROM=noreply@thorsignia.in
 EMAIL_TO=your-notification-email@example.com
+
+# Database Configuration (will be set automatically by Railway)
+DATABASE_URL=postgresql://...
 ```
 
 ## Project Structure
 
 - `/src` - Frontend React code
-- `/server` - Backend Express code
-  - `/db` - Database setup and SQLite file
+- `/app` - Backend Flask code
+  - `/models` - Database models
   - `/routes` - API routes
   - `/services` - Backend services (email, backup)
   - `/data` - Local backup storage (development only)
@@ -142,23 +152,14 @@ cd <YOUR_PROJECT_NAME>
 # Step 3: Install the necessary dependencies.
 npm i
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Step 4: Install Python dependencies
+pip install -r requirements.txt
+
+# Step 5: Start the development server with auto-reloading and an instant preview.
 npm run dev
+# In another terminal
+python app.py
 ```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
 
 ## What technologies are used for this project?
 
@@ -169,6 +170,8 @@ This project is built with:
 - React
 - shadcn-ui
 - Tailwind CSS
+- Flask
+- PostgreSQL/SQLite
 
 ## How can I deploy this project?
 

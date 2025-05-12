@@ -2,28 +2,22 @@
   "version": 2,
   "builds": [
     {
-      "src": "server/server.js",
-      "use": "@vercel/node"
+      "src": "wsgi.py",
+      "use": "@vercel/python"
     },
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "src": "dist/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/server/server.js"
-    },
-    {
-      "handle": "filesystem"
+      "dest": "wsgi.py"
     },
     {
       "src": "/(.*)",
-      "dest": "/server/server.js"
+      "dest": "dist/$1"
     }
   ],
   "env": {
